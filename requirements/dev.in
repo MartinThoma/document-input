@@ -1,0 +1,5 @@
+qrcode  # qr code generation
+pillow  # basic image operations
+opencv-python  # classical computer vision
+click  # cli parsing
+matplotlib  # histogram
