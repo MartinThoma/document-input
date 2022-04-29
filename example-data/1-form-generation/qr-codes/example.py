@@ -1,5 +1,6 @@
-import qrcode
 import uuid
+
+import qrcode
 
 
 def gen_qr(data, filename, error_correction):

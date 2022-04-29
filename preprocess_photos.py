@@ -1,11 +1,12 @@
 """Preprocess a photo"""
 
+from typing import List, NamedTuple, Tuple
+
 import click
-import numpy as np
 import cv2
+import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
-from typing import List, Tuple, NamedTuple
 
 
 class Point(NamedTuple):
