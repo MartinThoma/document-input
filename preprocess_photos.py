@@ -19,7 +19,7 @@ class Point(NamedTuple):
 def cli(filename: str):
     img = cv2.imread(filename)
     bb = find_corners(img)
-    # img = crop_image(img, bb[0], bb[1])
+    img = crop_image(img, bb[0], bb[1])
     save_np_array(img, "detected-corners.jpeg")
 
 
@@ -34,16 +34,15 @@ def find_candidates(original, image, close) -> List[Tuple[Point, Point]]:
     candidates = []
     contours = cv2.findContours(close, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = contours[0] if len(contours) == 2 else contours[1]
-    for contour in contours:
+    for i, contour in enumerate(contours):
         peri = cv2.arcLength(contour, True)
         approx = cv2.approxPolyDP(contour, 0.04 * peri, True)
         x, y, w, h = cv2.boundingRect(approx)
         area = cv2.contourArea(contour)
         ar = w / float(h)
         if len(approx) == 4 and area > 1000 and (ar > 0.85 and ar < 1.3):
-
             ROI = original[y : y + h, x : x + w]
-            cv2.imwrite("ROI.png", ROI)
+            cv2.imwrite(f"ROI-{i}.png", ROI)
             candidates.append((Point(x, y), Point(x + w, y + h)))
     return candidates
 
@@ -71,16 +70,16 @@ def find_corners(image) -> Tuple[Point, Point]:
     min_x, min_y = float("inf"), float("inf")
     max_x, max_y = 0, 0
     for p1, p2 in candidates:
-        min_x = min(min_x, p1.x)
-        min_y = min(min_y, p1.y)
-        max_x = max(max_x, p2.x)
-        max_y = max(max_y, p2.y)
+        min_x = min(min_x, p1.x, p2.x)
+        min_y = min(min_y, p1.y, p2.y)
+        max_x = max(max_x, p1.x, p2.x)
+        max_y = max(max_y, p1.x, p2.y)
 
     return Point(min_x, min_y), Point(max_x, max_y)
 
 
 def crop_image(image, p1: Point, p2: Point):
-    cropped = image[p1.x : p2.x, p1.y : p2.y]
+    cropped = image[p1.y : p2.y, p1.x : p2.x]
     return cropped
 
 
