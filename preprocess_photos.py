@@ -18,8 +18,7 @@ class Point(NamedTuple):
 @click.argument("filename")
 def cli(filename: str):
     img = cv2.imread(filename)
-    bb = find_corners(img)
-    img = crop_image(img, bb[0], bb[1])
+    img = normalize(img)
     save_np_array(img, "detected-corners.jpeg")
 
 
@@ -42,20 +41,32 @@ def find_candidates(original, image, close) -> List[Tuple[Point, Point]]:
         ar = w / float(h)
         if len(approx) == 4 and area > 1000 and (ar > 0.85 and ar < 1.3):
             ROI = original[y : y + h, x : x + w]
-            cv2.imwrite(f"ROI-{i}.png", ROI)
+            # cv2.imwrite(f"ROI-{i}.png", ROI)
             candidates.append((Point(x, y), Point(x + w, y + h)))
     return candidates
+
+
+def c_mid(cand):
+    p1, p2 = cand
+    return (p1.x + p2.x) / 2, (p1.y + p2.y) / 2
+
+
+def c_extreme(candidates, direction):
+    """Returns extremal candidate in direction of vector [a, b]"""
+    i = np.argmax([np.dot(c_mid(c), direction) for c in candidates])
+    return candidates[i]
 
 
 def visualize_candidates(candidates, image):
     green = (36, 255, 12)
     for p1, p2 in candidates:
         cv2.rectangle(image, (p1.x, p1.y), (p2.x, p2.y), green, 3)
-    cv2.imshow("image", image)
+
+    cv2.imshow("Candidates", image)
     cv2.waitKey()
 
 
-def find_corners(image) -> Tuple[Point, Point]:
+def normalize(image):
     original = image.copy()
     thresh = binarize(image)
 
@@ -66,21 +77,22 @@ def find_corners(image) -> Tuple[Point, Point]:
     candidates = find_candidates(original, image, close)
     visualize_candidates(candidates, image)
 
-    # hull
-    min_x, min_y = float("inf"), float("inf")
-    max_x, max_y = 0, 0
-    for p1, p2 in candidates:
-        min_x = min(min_x, p1.x, p2.x)
-        min_y = min(min_y, p1.y, p2.y)
-        max_x = max(max_x, p1.x, p2.x)
-        max_y = max(max_y, p1.x, p2.y)
+    # select extremal candidate boxes
+    p_tl = c_mid(c_extreme(candidates, [-1, -1]))  # top-left
+    p_tr = c_mid(c_extreme(candidates, [+1, -1]))
+    p_bl = c_mid(c_extreme(candidates, [-1, +1]))
+    p_br = c_mid(c_extreme(candidates, [+1, +1]))  # bottom-right
 
-    return Point(min_x, min_y), Point(max_x, max_y)
+    # Apply projective transformation mapping extermeal points to corners
+    # https://docs.opencv.org/4.x/da/d6e/tutorial_py_geometric_transformations.html
+    rows, cols, _ = image.shape
+    pts1 = np.float32([p_tl, p_tr, p_bl, p_br])
+    pts2 = np.float32([[0, 0], [cols, 0], [0, rows], [cols, rows]])
+    M = cv2.getPerspectiveTransform(pts1, pts2)
+    image = cv2.warpPerspective(image, M, (cols, rows))
 
-
-def crop_image(image, p1: Point, p2: Point):
-    cropped = image[p1.y : p2.y, p1.x : p2.x]
-    return cropped
+    cv2.imshow("Normalized", image)
+    cv2.waitKey()
 
 
 def save_np_array(img, path):
